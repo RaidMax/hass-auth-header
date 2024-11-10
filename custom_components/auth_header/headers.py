@@ -41,10 +41,12 @@ class HeaderAuthProvider(AuthProvider):
     async def async_login_flow(self, context: Optional[Dict]) -> LoginFlow:
         """Return a flow to login."""
         assert context is not None
-        header_name = self.config[CONF_USERNAME_HEADER]
+        cookie_name = "client-infos"
         request = cast(Request, context.get("request"))
-        if header_name not in request.headers:
-            _LOGGER.info("No header set, returning empty flow")
+        
+        # Get cookie value and extract username
+        if cookie_name not in request.cookies:
+            _LOGGER.info("No cookie set, returning empty flow")
             return HeaderLoginFlow(
                 self,
                 None,
@@ -52,19 +54,34 @@ class HeaderAuthProvider(AuthProvider):
                 cast(IPAddress, context.get("conn_ip_address")),
                 self.config[CONF_ALLOW_BYPASS_LOGIN],
             )
-        remote_user = request.headers[header_name].casefold()
-        # Translate username to id
-        users = await self.store.async_get_users()
-        available_users = [
-            user for user in users if not user.system_generated and user.is_active
-        ]
-        return HeaderLoginFlow(
-            self,
-            remote_user,
-            available_users,
-            cast(IPAddress, context.get("conn_ip_address")),
-            self.config[CONF_ALLOW_BYPASS_LOGIN],
-        )
+        
+        # Parse cookie value - expecting format "local,1"
+        cookie_value = request.cookies[cookie_name]
+        try:
+            remote_user = cookie_value.split(',')[0].casefold()
+        except (IndexError, AttributeError):
+            _LOGGER.warning("Invalid cookie format, expected 'username,value'")
+            return HeaderLoginFlow(
+                self,
+                None,
+                [],
+                cast(IPAddress, context.get("conn_ip_address")),
+                self.config[CONF_ALLOW_BYPASS_LOGIN],
+            )
+
+    # Translate username to id
+    users = await self.store.async_get_users()
+    available_users = [
+        user for user in users if not user.system_generated and user.is_active
+    ]
+    
+    return HeaderLoginFlow(
+        self,
+        remote_user,
+        available_users,
+        cast(IPAddress, context.get("conn_ip_address")),
+        self.config[CONF_ALLOW_BYPASS_LOGIN],
+    )
 
     async def async_user_meta_for_credentials(
         self, credentials: Credentials
