@@ -69,19 +69,19 @@ class HeaderAuthProvider(AuthProvider):
                 self.config[CONF_ALLOW_BYPASS_LOGIN],
             )
 
-    # Translate username to id
-    users = await self.store.async_get_users()
-    available_users = [
-        user for user in users if not user.system_generated and user.is_active
-    ]
-    
-    return HeaderLoginFlow(
-        self,
-        remote_user,
-        available_users,
-        cast(IPAddress, context.get("conn_ip_address")),
-        self.config[CONF_ALLOW_BYPASS_LOGIN],
-    )
+        # Translate username to id
+        users = await self.store.async_get_users()
+        available_users = [
+            user for user in users if not user.system_generated and user.is_active
+        ]
+
+        return HeaderLoginFlow(
+            self,
+            remote_user,
+            available_users,
+            cast(IPAddress, context.get("conn_ip_address")),
+            self.config[CONF_ALLOW_BYPASS_LOGIN],
+        )
 
     async def async_user_meta_for_credentials(
         self, credentials: Credentials
